@@ -1,1 +1,1 @@
-include ':GroovyDroid', ':groovylib'
+rootProject.name = 'groovy-droid'

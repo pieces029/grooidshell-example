@@ -2,8 +2,9 @@ package me.champeau.groovydroid;
 
 import android.util.Log;
 
+import com.android.dex.DexFormat;
 import com.android.dx.Version;
-import com.android.dx.dex.DexFormat;
+import com.android.dx.cf.direct.DirectClassFile;
 import com.android.dx.dex.DexOptions;
 import com.android.dx.dex.cf.CfOptions;
 import com.android.dx.dex.cf.CfTranslator;
@@ -12,7 +13,6 @@ import com.android.dx.dex.file.ClassDefItem;
 import com.android.dx.dex.file.DexFile;
 
 import java.util.Collections;
-import org.codehaus.groovy.control.BytecodeProcessor;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.io.ByteArrayOutputStream;
@@ -71,13 +71,12 @@ public class GrooidShell {
         final Set<String> classNames = new LinkedHashSet<>();
         final DexFile dexFile = new DexFile(dexOptions);
         CompilerConfiguration config = new CompilerConfiguration();
-        config.setBytecodePostprocessor(new BytecodeProcessor() {
-            @Override public byte[] processBytecode(String s, byte[] bytes) {
-                ClassDefItem classDefItem = CfTranslator.translate(s+".class", bytes, cfOptions, dexOptions);
-                dexFile.add(classDefItem);
-                classNames.add(s);
-                return bytes;
-            }
+        config.setBytecodePostprocessor((s, bytes) -> {
+            DirectClassFile directClassFile = new DirectClassFile(bytes, s + ".class", true);
+            ClassDefItem classDefItem = CfTranslator.translate(directClassFile, bytes, cfOptions, dexOptions, dexFile);
+            dexFile.add(classDefItem);
+            classNames.add(s);
+            return bytes;
         });
 
         GrooidClassLoader gcl = new GrooidClassLoader(this.classLoader, config);
@@ -117,7 +116,7 @@ public class GrooidShell {
 
     private Map<String,Class> defineDynamic(Set<String> classNames, byte[] dalvikBytecode) {
         File tmpDex = new File(tmpDynamicFiles, UUID.randomUUID().toString()+".jar");
-        Map<String,Class> result = new LinkedHashMap<String, Class>();
+        Map<String,Class> result = new LinkedHashMap<>();
         try {
             FileOutputStream fos = new FileOutputStream(tmpDex);
             JarOutputStream jar = new JarOutputStream(fos, makeManifest());
@@ -153,7 +152,7 @@ public class GrooidShell {
         return manifest;
     }
 
-    private static class EvalResult {
+    static class EvalResult {
         final long compilationTime;
         final long execTime;
         final Object result;
